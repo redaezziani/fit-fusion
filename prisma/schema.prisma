@@ -1,0 +1,177 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "mysql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DATABASE_URL")
+}
+ 
+
+model resetPasswordRequest {
+  id        String    @id @default(uuid()) @db.VarChar(36)
+  token     Int    @unique
+  expires   DateTime
+  userId    String    @unique @db.VarChar(36)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+  user      users     @relation(fields: [userId], references: [id])
+}
+
+model userVerificationRequest {
+  id        String    @id @default(uuid()) @db.VarChar(36)
+  token     String    @unique
+  expires   DateTime
+  userId    String    @unique @db.VarChar(36)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+  user      users     @relation(fields: [userId], references: [id])
+}
+enum Role {
+  user
+  admin
+}
+
+// test next auth 
+model User {
+  id            String          @id @default(cuid())
+  name          String?
+  username      String?         @unique
+  email         String?         @unique
+  emailVerified DateTime?
+  image         String?
+  Session       Session[]
+  Account       Account?
+  // Optional for WebAuthn support
+ 
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+ 
+model Account {
+  id                       String  @id @default(cuid())
+  userId                   String  @unique
+  type                     String
+  provider                 String
+  providerAccountId        String
+  refresh_token            String? @db.Text
+  access_token             String? @db.Text
+  expires_at               Int?
+  token_type               String?
+  scope                    String?
+  id_token                 String? @db.Text
+  session_state            String?
+  refresh_token_expires_in Int?
+  user                     User?   @relation(fields: [userId], references: [id])
+ 
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+ 
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+ 
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id])
+ 
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+ 
+  @@index([userId])
+}
+ 
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+ 
+  @@unique([identifier, token])
+}
+model users {
+  id           String                   @id @default(uuid()) @db.VarChar(36)
+  email        String                   @unique
+  name         String?
+  username      String?         @unique
+  password     String
+  role         Role                     @default(user)
+  image        String?                  @default("")
+  isVerified   Boolean                  @default(false)
+  stripeId     String?
+  sendAnonce   Boolean                  @default(false)
+  createdAt    DateTime                 @default(now())
+  updatedAt    DateTime                 @default(now()) @updatedAt
+  emailVerified DateTime? 
+  resetRequest resetPasswordRequest?
+  verification userVerificationRequest?
+  deletedAt    DateTime?
+  @@index([id], map: "idx_user_id")
+  @@index([email], map: "idx_user_email") 
+  @@index([name], map: "idx_user_name")
+  workOutLogs  WorkoutLog[]
+  userExercises UserExercise[]
+  exercises    Exercise[]
+  goals        Goals[]
+}
+
+
+// موديل سجلات التمارين
+model WorkoutLog {
+  id           String    @id @default(uuid()) @db.VarChar(36)  // معرف فريد لكل سجل، مولد تلقائي للقيمة، ونوع البيانات VARCHAR(36) في قاعدة البيانات
+  userId       String    @db.VarChar(36)  // معرف المستخدم المرتبط بالسجل
+  user         users     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  exerciseId   String    @db.VarChar(36)  // معرف التمرين المرتبط بالسجل
+  notes        String?   // ملاحظات إضافية
+  date         DateTime  // تاريخ ووقت التمرين
+}
+
+model Exercise {
+  id            String     @id @default(uuid()) @db.VarChar(36)  // معرف فريد لكل تمرين، مولد تلقائي للقيمة، ونوع البيانات VARCHAR(36) في قاعدة البيانات
+  name          String     // اسم التمرين
+  description   String     // وصف التمرين
+  userId        String     @db.VarChar(36)  // معرف المستخدم المالك للتمرين
+  difficulty    String     // مستوى صعوبة التمرين
+  instructions  String?    // تعليمات التمرين
+  videoUrl      String?    // رابط الفيديو (إذا كان متوفرًا)
+  image         String?    // رابط الصورة (إذا كان متوفرًا)
+  imageUrl      String?    // رابط الصورة (إذا كان متوفرًا)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @default(now()) @updatedAt
+  deletedAt     DateTime?
+  user          users      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userExercises UserExercise[]
+}
+
+model UserExercise {
+  id           String    @id @default(uuid()) @db.VarChar(36)  // معرف فريد لكل تمرين، مولد تلقائي للقيمة، ونوع البيانات VARCHAR(36) في قاعدة البيانات
+  userId       String    @db.VarChar(36)  // معرف المستخدم المرتبط بالتمرين
+  user         users     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  exerciseId   String    @db.VarChar(36)
+  exercise     Exercise  @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+  sets         Int       // عدد الجولات
+  reps         Int       // عدد التكرارات
+  weight       Float     // الوزن المستخدم
+  notes        String?   // ملاحظات إضافية
+  date         DateTime  // تاريخ ووقت التمرين
+}
+
+model Goals {
+  id           String    @id @default(uuid()) @db.VarChar(36)  // معرف فريد لكل هدف، مولد تلقائي للقيمة، ونوع البيانات VARCHAR(36) في قاعدة البيانات
+  userId       String    @db.VarChar(36)  // معرف المستخدم المرتبط بالهدف
+  user         users     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title        String    // عنوان الهدف
+  description  String    // وصف الهدف
+  deadline     DateTime  // تاريخ ووقت انتهاء الهدف
+  isSet        Boolean   @default(false)   // هل تم تحقيق الهدف؟
+  isStarted    Boolean   @default(false)   // هل بدأ المستخدم في تحقيق الهدف؟
+  isFailed     Boolean   @default(false)// هل فشل المستخدم في تحقيق الهدف؟
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @default(now()) @updatedAt
+  deletedAt    DateTime?
+}
